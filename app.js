@@ -32,12 +32,12 @@ const state = {
 
 // ===== CONFIGURACIÓN =====
 const BATHROOMS = [
-    'Planta Baja - Baño Hombres',
-    'Planta Baja - Baño Mujeres',
-    'Piso 1 - Baño Hombres',
-    'Piso 1 - Baño Mujeres',
-    'Piso 2 - Baño Hombres',
-    'Piso 2 - Baño Mujeres'
+    'Planta Baja - Sanitario Hombres',
+    'Planta Baja - Sanitario Mujeres',
+    'Piso 1 - Sanitario Hombres',
+    'Piso 1 - Sanitario Mujeres',
+    'Piso 2 - Sanitario Hombres',
+    'Piso 2 - Sanitario Mujeres'
 ];
 
 // ===== UTILIDADES =====
@@ -78,6 +78,65 @@ const getTimeElapsed = (timestamp) => {
 const switchScreen = (screenId) => {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
+};
+
+// ===== ESCÁNER QR =====
+let html5QrcodeScanner = null;
+
+const startQRScanner = () => {
+    const qrReaderDiv = document.getElementById('qr-reader');
+    const scanBtn = document.getElementById('scanBtn');
+    const stopBtn = document.getElementById('stopScanBtn');
+
+    // Mostrar el área del escáner
+    qrReaderDiv.style.display = 'block';
+    scanBtn.style.display = 'none';
+    stopBtn.style.display = 'block';
+
+    html5QrcodeScanner = new Html5Qrcode("qr-reader");
+
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+    };
+
+    html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText, decodedResult) => {
+            // QR detectado
+            console.log(`QR detectado: ${decodedText}`);
+            stopQRScanner();
+            handleQRScan(decodedText);
+        },
+        (errorMessage) => {
+            // Error de escaneo (puede ser ignorado)
+        }
+    ).catch(err => {
+        console.error('Error al iniciar escáner:', err);
+        showToast('Error al acceder a la cámara', 'error');
+        stopQRScanner();
+    });
+};
+
+const stopQRScanner = () => {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            html5QrcodeScanner.clear();
+            html5QrcodeScanner = null;
+        }).catch(err => {
+            console.error('Error al detener escáner:', err);
+        });
+    }
+
+    const qrReaderDiv = document.getElementById('qr-reader');
+    const scanBtn = document.getElementById('scanBtn');
+    const stopBtn = document.getElementById('stopScanBtn');
+
+    qrReaderDiv.style.display = 'none';
+    scanBtn.style.display = 'block';
+    stopBtn.style.display = 'none';
 };
 
 // ===== GESTIÓN DE USUARIOS =====
@@ -370,7 +429,7 @@ const loadBanosStatus = async () => {
             banosStatus.appendChild(card);
         }
     } catch (error) {
-        console.error('Error al cargar estado de baños:', error);
+        console.error('Error al cargar estado de sanitarios:', error);
     }
 };
 
@@ -444,7 +503,7 @@ const loadAdminHistorial = async () => {
 
 const setupAdminFilters = () => {
     const filterBano = document.getElementById('filterBano');
-    filterBano.innerHTML = '<option value="all">Todos los baños</option>';
+    filterBano.innerHTML = '<option value="all">Todos los sanitarios</option>';
     BATHROOMS.forEach(bano => {
         const option = document.createElement('option');
         option.value = bano;
@@ -597,9 +656,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
     document.getElementById('logoutAdminBtn').addEventListener('click', handleLogout);
 
-    document.getElementById('scanBtn').addEventListener('click', () => {
-        document.getElementById('qrInput').click();
-    });
+    document.getElementById('scanBtn').addEventListener('click', startQRScanner);
+
+    document.getElementById('stopScanBtn').addEventListener('click', stopQRScanner);
 
     document.getElementById('closeModal').addEventListener('click', () => {
         document.getElementById('reporteModal').classList.remove('active');
