@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Función helper para verificar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Función helper para verificar si es administrador
+    function isAdmin() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'administrador';
+    }
+
+    // Función helper para verificar si el usuario está activo
+    function isActiveUser() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo == true;
+    }
+
+    // Reglas para la colección de registros
+    match /registros/{registroId} {
+      // Permitir lectura si está autenticado y activo
+      allow read: if isActiveUser();
+
+      // Permitir crear registro si está actenticado, activo y es el usuario que lo crea
+      allow create: if isActiveUser()
+                    && request.resource.data.usuario == request.auth.token.email
+                    && request.resource.data.keys().hasAll(['ubicacion', 'fecha', 'usuario', 'tieneReporte'])
+                    && request.resource.data.fecha is timestamp;
+
+      // Solo admins pueden actualizar o eliminar
+      allow update, delete: if isAdmin();
+    }
+
+    // Reglas para la colección de usuarios
+    match /usuarios/{userId} {
+      // Todos los usuarios autenticados pueden leer cualquier usuario
+      allow read: if isAuthenticated();
+
+      // Permitir crear su propio documento en el primer login
+      allow create: if isAuthenticated()
+                    && userId == request.auth.uid
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.activo == true;
+
+      // Solo admins pueden actualizar usuarios
+      allow update: if isAdmin();
+
+      // Permitir al usuario actualizar su propio ultimoAcceso
+      allow update: if isAuthenticated()
+                    && userId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoAcceso']);
+
+      // Solo admins pueden eliminar usuarios
+      allow delete: if isAdmin();
+    }
+  }
+}

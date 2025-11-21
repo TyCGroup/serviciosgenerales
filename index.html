@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Control de Limpieza</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Pantalla de Login -->
+    <div id="loginScreen" class="screen active">
+        <div class="login-container">
+            <div class="login-header">
+                <i class="fas fa-toilet"></i>
+                <h1>Control de Limpieza</h1>
+                <p>Sistema de Gesti�n Empresarial</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input type="email" id="username" placeholder="Correo electr�nico" required autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" placeholder="Contrase�a" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-primary">
+                    <span class="btn-text">Iniciar Sesi�n</span>
+                    <span class="btn-loader hidden"><i class="fas fa-spinner fa-spin"></i></span>
+                </button>
+                <div id="loginError" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Vista Limpieza -->
+    <div id="limpiezaScreen" class="screen">
+        <div class="app-header">
+            <div class="header-content">
+                <h2>Control de Limpieza</h2>
+                <div class="user-info">
+                    <span id="userNameDisplay"></span>
+                    <button id="logoutBtn" class="btn-icon" title="Cerrar Sesi�n">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <!-- Tab Nuevo -->
+            <div id="nuevoTab" class="tab-content active">
+                <div class="scan-section">
+                    <div class="scan-card">
+                        <i class="fas fa-qrcode scan-icon"></i>
+                        <h3>Escanear C�digo QR</h3>
+                        <p>Presiona el bot�n para escanear el c�digo del ba�o</p>
+                        <button id="scanBtn" class="btn-scan">
+                            <i class="fas fa-camera"></i> Escanear QR
+                        </button>
+                        <input type="file" id="qrInput" accept="image/*" style="display: none;">
+                    </div>
+
+                    <!-- Simulador QR para testing -->
+                    <div class="qr-simulator">
+                        <p class="simulator-label">Simulador (Testing)</p>
+                        <select id="qrSimulator" class="select-simulator">
+                            <option value="">Seleccionar ba�o...</option>
+                            <option value="Planta Baja - Ba�o Hombres">Planta Baja - Ba�o Hombres</option>
+                            <option value="Planta Baja - Ba�o Mujeres">Planta Baja - Ba�o Mujeres</option>
+                            <option value="Piso 1 - Ba�o Hombres">Piso 1 - Ba�o Hombres</option>
+                            <option value="Piso 1 - Ba�o Mujeres">Piso 1 - Ba�o Mujeres</option>
+                            <option value="Piso 2 - Ba�o Hombres">Piso 2 - Ba�o Hombres</option>
+                            <option value="Piso 2 - Ba�o Mujeres">Piso 2 - Ba�o Mujeres</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Historial -->
+            <div id="historialTab" class="tab-content">
+                <div class="historial-filters">
+                    <input type="text" id="searchHistorial" placeholder="Buscar por ubicaci�n..." class="search-input">
+                    <select id="filterHistorial" class="filter-select">
+                        <option value="all">Todos</option>
+                        <option value="normal">Sin problemas</option>
+                        <option value="reporte">Con reportes</option>
+                    </select>
+                </div>
+                <div id="historialList" class="historial-list"></div>
+            </div>
+        </div>
+
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-tab="nuevo">
+                <i class="fas fa-qrcode"></i>
+                <span>Nuevo</span>
+            </button>
+            <button class="nav-item" data-tab="historial">
+                <i class="fas fa-history"></i>
+                <span>Historial</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Vista Administrador -->
+    <div id="adminScreen" class="screen">
+        <div class="app-header">
+            <div class="header-content">
+                <h2>Panel Administrativo</h2>
+                <div class="user-info">
+                    <span id="adminNameDisplay"></span>
+                    <button id="logoutAdminBtn" class="btn-icon" title="Cerrar Sesi�n">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-area admin-content">
+            <!-- Estad�sticas -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="fas fa-check-circle stat-icon success"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="totalLimpiezas">0</span>
+                        <span class="stat-label">Limpiezas Hoy</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-exclamation-triangle stat-icon warning"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="totalReportes">0</span>
+                        <span class="stat-label">Reportes Pendientes</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estado de Ba�os -->
+            <div class="section">
+                <h3 class="section-title">Estado de Ba�os</h3>
+                <div id="banosStatus" class="banos-grid"></div>
+            </div>
+
+            <!-- Reportes -->
+            <div class="section">
+                <h3 class="section-title">Reportes Activos</h3>
+                <div id="reportesList" class="reportes-list"></div>
+            </div>
+
+            <!-- Gestión de Usuarios -->
+            <div class="section">
+                <div class="section-header">
+                    <h3 class="section-title">Gestión de Usuarios</h3>
+                    <button id="btnAgregarUsuario" class="btn-primary btn-small">
+                        <i class="fas fa-user-plus"></i> Agregar Usuario
+                    </button>
+                </div>
+                <div id="usuariosList" class="usuarios-grid"></div>
+            </div>
+
+            <!-- Historial General -->
+            <div class="section">
+                <h3 class="section-title">Historial General</h3>
+                <div class="historial-filters">
+                    <input type="date" id="filterFecha" class="filter-input">
+                    <select id="filterBano" class="filter-select">
+                        <option value="all">Todos los ba�os</option>
+                    </select>
+                </div>
+                <div id="adminHistorialList" class="historial-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Reporte -->
+    <div id="reporteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>�Algo que reportar?</h3>
+                <button class="modal-close" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="location-badge" id="modalLocation"></div>
+                <div class="modal-actions">
+                    <button id="noReporteBtn" class="btn-secondary">
+                        <i class="fas fa-check"></i> No, todo bien
+                    </button>
+                    <button id="siReporteBtn" class="btn-warning">
+                        <i class="fas fa-exclamation-circle"></i> S�, hay un problema
+                    </button>
+                </div>
+                <div id="reporteForm" class="reporte-form hidden">
+                    <textarea id="reporteDescripcion" placeholder="Describe el problema encontrado..." rows="4"></textarea>
+                    <button id="submitReporteBtn" class="btn-primary">Registrar Reporte</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Usuario -->
+    <div id="usuarioModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="usuarioModalTitle">Agregar Usuario</h3>
+                <button class="modal-close" id="closeUsuarioModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="usuarioForm" class="usuario-form">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="usuarioEmail" placeholder="usuario@empresa.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Completo</label>
+                        <input type="text" id="usuarioNombre" placeholder="Juan Pérez" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Rol</label>
+                        <select id="usuarioRol" required>
+                            <option value="limpieza">Limpieza</option>
+                            <option value="administrador">Administrador</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select id="usuarioActivo" required>
+                            <option value="true">Activo</option>
+                            <option value="false">Inactivo</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="cancelUsuarioBtn" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
