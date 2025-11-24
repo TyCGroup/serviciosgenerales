@@ -137,6 +137,27 @@ body {
     color: var(--text-secondary);
 }
 
+.toggle-password {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 18px;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle-password:hover {
+    color: var(--primary-color);
+}
+
+.toggle-password:active {
+    transform: scale(0.95);
+}
+
 /* ===== BOTONES ===== */
 .btn-primary, .btn-secondary, .btn-warning, .btn-scan {
     padding: 14px 24px;
@@ -566,6 +587,13 @@ body {
     border-left: 4px solid var(--warning-color);
     border-radius: 12px;
     padding: 16px;
+    transition: var(--transition);
+}
+
+.reporte-card.revisado {
+    background: #ecfdf5;
+    border-left-color: var(--success-color);
+    opacity: 0.8;
 }
 
 .reporte-header {
@@ -579,16 +607,50 @@ body {
     color: #92400e;
 }
 
+.reporte-card.revisado .reporte-ubicacion {
+    color: #065f46;
+}
+
 .reporte-fecha {
     font-size: 13px;
     color: #92400e;
     opacity: 0.8;
 }
 
+.reporte-card.revisado .reporte-fecha {
+    color: #065f46;
+}
+
 .reporte-descripcion {
     font-size: 14px;
     color: #92400e;
     margin-top: 8px;
+}
+
+.btn-revisar {
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: var(--success-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-revisar:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-revisar:active {
+    transform: translateY(0);
 }
 
 /* ===== GESTIÓN DE USUARIOS ===== */
@@ -726,6 +788,40 @@ body {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.1);
+}
+
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrapper input {
+    flex: 1;
+    padding-right: 40px;
+}
+
+.toggle-password-inline {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 16px;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle-password-inline:hover {
+    color: var(--primary-color);
+}
+
+.toggle-password-inline:active {
+    transform: scale(0.95);
 }
 
 /* Loading Screen */

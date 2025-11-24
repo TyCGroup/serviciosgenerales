@@ -5,7 +5,8 @@ import {
     signOut,
     onAuthStateChanged,
     setPersistence,
-    browserLocalPersistence
+    browserLocalPersistence,
+    createUserWithEmailAndPassword
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
     collection,
@@ -460,8 +461,10 @@ const loadReportes = async () => {
         reportesList.innerHTML = '';
         snapshot.forEach((doc) => {
             const data = doc.data();
+            const docId = doc.id;
             const card = document.createElement('div');
-            card.className = 'reporte-card';
+            card.className = `reporte-card ${data.revisado ? 'revisado' : ''}`;
+
             card.innerHTML = `
                 <div class="reporte-header">
                     <div class="reporte-ubicacion">${data.ubicacion}</div>
@@ -471,6 +474,15 @@ const loadReportes = async () => {
                 <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">
                     <i class="fas fa-user"></i> ${data.usuario.split('@')[0]}
                 </div>
+                ${data.revisado ? `
+                    <div style="margin-top: 8px; padding: 8px; background: #d1fae5; border-radius: 6px; font-size: 12px; color: #065f46;">
+                        <i class="fas fa-check-circle"></i> Revisado por: ${data.revisadoPor} el ${formatDate(data.fechaRevision)} a las ${formatTime(data.fechaRevision)}
+                    </div>
+                ` : `
+                    <button class="btn-revisar" onclick="marcarComoRevisado('${docId}')">
+                        <i class="fas fa-check"></i> Marcar como Revisado
+                    </button>
+                `}
             `;
             reportesList.appendChild(card);
         });
@@ -515,6 +527,95 @@ const setupAdminFilters = () => {
         option.textContent = bano;
         filterBano.appendChild(option);
     });
+};
+
+const marcarComoRevisado = async (docId) => {
+    try {
+        if (!state.currentUserData) {
+            showToast('Error: Usuario no identificado', 'error');
+            return;
+        }
+
+        await updateDoc(doc(db, 'registros', docId), {
+            revisado: true,
+            revisadoPor: state.currentUserData.nombre || state.currentUser.email.split('@')[0],
+            fechaRevision: Timestamp.now()
+        });
+
+        showToast('Reporte marcado como revisado', 'success');
+        loadReportes();
+    } catch (error) {
+        console.error('Error al marcar reporte:', error);
+        showToast('Error al actualizar el reporte', 'error');
+    }
+};
+
+// Hacer función global para onclick
+window.marcarComoRevisado = marcarComoRevisado;
+
+const exportToExcel = async () => {
+    try {
+        showToast('Generando archivo Excel...', 'success');
+
+        // Obtener todos los registros
+        const q = query(
+            collection(db, 'registros'),
+            orderBy('fecha', 'desc')
+        );
+
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            showToast('No hay datos para exportar', 'error');
+            return;
+        }
+
+        // Preparar datos para Excel
+        const data = [];
+        snapshot.forEach((doc) => {
+            const registro = doc.data();
+            data.push({
+                'Fecha': formatDate(registro.fecha),
+                'Hora': formatTime(registro.fecha),
+                'Ubicación': registro.ubicacion,
+                'Usuario': registro.usuario,
+                'Tiene Reporte': registro.tieneReporte ? 'Sí' : 'No',
+                'Reporte': registro.reporte || 'N/A',
+                'Estado': registro.revisado ? 'Revisado' : 'Pendiente',
+                'Revisado Por': registro.revisadoPor || 'N/A'
+            });
+        });
+
+        // Crear libro de Excel
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        // Ajustar ancho de columnas
+        ws['!cols'] = [
+            { wch: 12 }, // Fecha
+            { wch: 8 },  // Hora
+            { wch: 30 }, // Ubicación
+            { wch: 25 }, // Usuario
+            { wch: 14 }, // Tiene Reporte
+            { wch: 40 }, // Reporte
+            { wch: 12 }, // Estado
+            { wch: 25 }  // Revisado Por
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, "Registros");
+
+        // Generar nombre de archivo con fecha
+        const fecha = new Date().toISOString().split('T')[0];
+        const fileName = `Registros_Limpieza_${fecha}.xlsx`;
+
+        // Descargar archivo
+        XLSX.writeFile(wb, fileName);
+
+        showToast('Archivo Excel descargado correctamente', 'success');
+    } catch (error) {
+        console.error('Error al exportar a Excel:', error);
+        showToast('Error al generar archivo Excel', 'error');
+    }
 };
 
 // ===== GESTIÓN DE USUARIOS =====
@@ -583,6 +684,13 @@ const editUsuario = (userId, userData) => {
     document.getElementById('usuarioNombre').value = userData.nombre;
     document.getElementById('usuarioRol').value = userData.rol;
     document.getElementById('usuarioActivo').value = userData.activo.toString();
+
+    // Ocultar campo de contraseña al editar
+    const passwordGroup = document.getElementById('passwordGroup');
+    const passwordInput = document.getElementById('usuarioPassword');
+    passwordGroup.style.display = 'none';
+    passwordInput.removeAttribute('required');
+
     document.getElementById('usuarioModal').classList.add('active');
 };
 
@@ -602,11 +710,19 @@ const toggleUsuarioActivo = async (userId, nuevoEstado) => {
 const handleUsuarioFormSubmit = async (e) => {
     e.preventDefault();
 
+    const email = document.getElementById('usuarioEmail').value;
+    const password = document.getElementById('usuarioPassword').value;
     const nombre = document.getElementById('usuarioNombre').value;
     const rol = document.getElementById('usuarioRol').value;
     const activo = document.getElementById('usuarioActivo').value === 'true';
 
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+
     try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Guardando...';
+
         if (currentEditingUserId) {
             // Actualizar usuario existente
             await updateDoc(doc(db, 'usuarios', currentEditingUserId), {
@@ -616,25 +732,103 @@ const handleUsuarioFormSubmit = async (e) => {
             });
             showToast('Usuario actualizado correctamente', 'success');
         } else {
-            // Crear nuevo usuario (nota: solo actualiza Firestore, debe crear en Auth manualmente)
-            showToast('Para crear usuarios, primero créalos en Firebase Authentication. Al iniciar sesión se registrarán automáticamente.', 'error');
-            document.getElementById('usuarioModal').classList.remove('active');
-            return;
+            // Crear nuevo usuario en Firebase Authentication
+            if (!password || password.length < 6) {
+                showToast('La contraseña debe tener al menos 6 caracteres', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                return;
+            }
+
+            // Crear usuario en Authentication (esto cambiará la sesión temporalmente)
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const newUser = userCredential.user;
+
+            // Crear documento en Firestore para el nuevo usuario
+            await setDoc(doc(db, 'usuarios', newUser.uid), {
+                email: email,
+                nombre: nombre,
+                rol: rol,
+                activo: activo,
+                fechaCreacion: Timestamp.now(),
+                ultimoAcceso: null
+            });
+
+            // Cerrar sesión del usuario recién creado
+            await signOut(auth);
+
+            // Restaurar la sesión del admin
+            // La persistencia se encargará de restaurar automáticamente la sesión del admin
+            // gracias a onAuthStateChanged
+
+            showToast('Usuario creado correctamente. Recargando sesión...', 'success');
         }
 
         document.getElementById('usuarioModal').classList.remove('active');
         document.getElementById('usuarioForm').reset();
         currentEditingUserId = null;
-        loadUsuarios();
+
+        // Si es una actualización, recargar usuarios inmediatamente
+        if (currentEditingUserId) {
+            loadUsuarios();
+        }
     } catch (error) {
         console.error('Error al guardar usuario:', error);
-        showToast('Error al guardar el usuario', 'error');
+
+        // Mensajes de error específicos
+        let errorMessage = 'Error al guardar el usuario';
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'Este email ya está registrado';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Email inválido';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'La contraseña es muy débil';
+        }
+
+        showToast(errorMessage, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
     }
 };
 
 // Hacer funciones globales para onclick
 window.editUsuario = editUsuario;
 window.toggleUsuarioActivo = toggleUsuarioActivo;
+
+// ===== TOGGLE PASSWORD =====
+const togglePassword = (inputId) => {
+    const input = document.getElementById(inputId);
+    const button = input.nextElementSibling;
+
+    if (!button || !button.classList.contains('toggle-password') && !button.classList.contains('toggle-password-inline')) {
+        // Si no hay botón adyacente, buscar en el wrapper
+        const wrapper = input.parentElement;
+        const btn = wrapper.querySelector('.toggle-password-inline');
+        if (btn) {
+            togglePasswordLogic(input, btn);
+        }
+    } else {
+        togglePasswordLogic(input, button);
+    }
+};
+
+const togglePasswordLogic = (input, button) => {
+    const icon = button.querySelector('i');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+};
+
+// Hacer función global
+window.togglePassword = togglePassword;
 
 // ===== NAVEGACIÓN =====
 const setupNavigation = () => {
@@ -679,6 +873,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('usuarioModalTitle').textContent = 'Agregar Usuario';
         document.getElementById('usuarioEmail').disabled = false;
         document.getElementById('usuarioForm').reset();
+
+        // Mostrar y requerir campo de contraseña al crear nuevo usuario
+        const passwordGroup = document.getElementById('passwordGroup');
+        const passwordInput = document.getElementById('usuarioPassword');
+        passwordGroup.style.display = 'flex';
+        passwordInput.setAttribute('required', '');
+
         document.getElementById('usuarioModal').classList.add('active');
     });
 
@@ -691,6 +892,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('usuarioForm').addEventListener('submit', handleUsuarioFormSubmit);
+
+    document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
 
     setupNavigation();
 
