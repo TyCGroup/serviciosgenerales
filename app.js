@@ -3,7 +3,9 @@ import { auth, db } from './firebase-config.js';
 import {
     signInWithEmailAndPassword,
     signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    setPersistence,
+    browserLocalPersistence
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
     collection,
@@ -195,6 +197,9 @@ const handleLogin = async (e) => {
         btnLoader.classList.remove('hidden');
         submitBtn.disabled = true;
         loginError.textContent = '';
+
+        // Habilitar persistencia de sesión
+        await setPersistence(auth, browserLocalPersistence);
 
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
@@ -689,11 +694,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setupNavigation();
 
-    onAuthStateChanged(auth, (user) => {
+    // Manejar persistencia de sesión
+    const loadingScreen = document.getElementById('loadingScreen');
+
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
-            state.currentUser = user;
+            try {
+                // Usuario autenticado, cargar sus datos
+                const userData = await getUserFromFirestore(user.uid);
+
+                if (!userData || !userData.activo) {
+                    // Usuario inactivo, cerrar sesión
+                    await signOut(auth);
+                    showToast('Usuario inactivo. Contacta al administrador.', 'error');
+                    switchScreen('loginScreen');
+                    loadingScreen.classList.add('hidden');
+                    return;
+                }
+
+                state.currentUser = user;
+                state.currentUserData = userData;
+                state.currentRole = userData.rol;
+
+                // Actualizar último acceso
+                await updateDoc(doc(db, 'usuarios', user.uid), {
+                    ultimoAcceso: Timestamp.now()
+                });
+
+                // Redirigir a la pantalla correcta según el rol
+                if (userData.rol === 'administrador') {
+                    document.getElementById('adminNameDisplay').textContent = userData.nombre || user.email.split('@')[0];
+                    switchScreen('adminScreen');
+                    loadAdminData();
+                } else {
+                    document.getElementById('userNameDisplay').textContent = userData.nombre || user.email.split('@')[0];
+                    switchScreen('limpiezaScreen');
+                    loadHistorial();
+                }
+
+                // Ocultar pantalla de carga
+                loadingScreen.classList.add('hidden');
+            } catch (error) {
+                console.error('Error al restaurar sesión:', error);
+                switchScreen('loginScreen');
+                loadingScreen.classList.add('hidden');
+            }
         } else {
+            // No hay usuario autenticado
             switchScreen('loginScreen');
+            loadingScreen.classList.add('hidden');
         }
     });
 });
