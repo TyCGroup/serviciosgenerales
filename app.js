@@ -740,7 +740,58 @@ const handleUsuarioFormSubmit = async (e) => {
                 return;
             }
 
-            // Crear usuario en Authentication (esto cambiará la sesión temporalmente)
+            // Guardar credenciales del admin actual ANTES de crear el nuevo usuario
+            const adminEmail = state.currentUser.email;
+
+            // Solicitar contraseña del admin para re-autenticarlo después
+            const adminPassword = await new Promise((resolve, reject) => {
+                const adminPasswordModal = document.createElement('div');
+                adminPasswordModal.className = 'modal active';
+                adminPasswordModal.innerHTML = `
+                    <div class="modal-content" style="max-width: 400px;">
+                        <div class="modal-header">
+                            <h3>Confirmar Identidad</h3>
+                        </div>
+                        <div class="modal-body">
+                            <p style="margin-bottom: 16px; color: var(--text-secondary);">
+                                Para crear un usuario, confirma tu contraseña de administrador:
+                            </p>
+                            <div class="form-group">
+                                <label>Tu Contraseña</label>
+                                <div class="password-input-wrapper">
+                                    <input type="password" id="adminPasswordConfirm" placeholder="Contraseña de administrador" required>
+                                    <button type="button" class="toggle-password-inline" onclick="togglePassword('adminPasswordConfirm')">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" id="cancelAdminPassword" class="btn-secondary">Cancelar</button>
+                                <button type="button" id="confirmAdminPassword" class="btn-primary">Confirmar</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(adminPasswordModal);
+
+                document.getElementById('confirmAdminPassword').onclick = () => {
+                    const pwd = document.getElementById('adminPasswordConfirm').value;
+                    if (pwd) {
+                        document.body.removeChild(adminPasswordModal);
+                        resolve(pwd);
+                    } else {
+                        showToast('Debes ingresar tu contraseña', 'error');
+                    }
+                };
+
+                document.getElementById('cancelAdminPassword').onclick = () => {
+                    document.body.removeChild(adminPasswordModal);
+                    reject(new Error('Cancelado por el usuario'));
+                };
+            });
+
+            // Crear usuario nuevo (esto cambiará temporalmente la sesión)
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
 
@@ -757,21 +808,18 @@ const handleUsuarioFormSubmit = async (e) => {
             // Cerrar sesión del usuario recién creado
             await signOut(auth);
 
-            // Restaurar la sesión del admin
-            // La persistencia se encargará de restaurar automáticamente la sesión del admin
-            // gracias a onAuthStateChanged
+            // Re-autenticar al administrador con su contraseña
+            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
 
-            showToast('Usuario creado correctamente. Recargando sesión...', 'success');
+            showToast('Usuario creado correctamente', 'success');
+
+            // Recargar lista de usuarios
+            loadUsuarios();
         }
 
         document.getElementById('usuarioModal').classList.remove('active');
         document.getElementById('usuarioForm').reset();
         currentEditingUserId = null;
-
-        // Si es una actualización, recargar usuarios inmediatamente
-        if (currentEditingUserId) {
-            loadUsuarios();
-        }
     } catch (error) {
         console.error('Error al guardar usuario:', error);
 
