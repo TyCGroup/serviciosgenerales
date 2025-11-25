@@ -558,27 +558,41 @@ const exportToExcel = async () => {
         showToast('Generando archivo Excel...', 'success');
 
         // Obtener todos los registros
-        const q = query(
+        const qRegistros = query(
             collection(db, 'registros'),
             orderBy('fecha', 'desc')
         );
 
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocs(qRegistros);
 
         if (snapshot.empty) {
             showToast('No hay datos para exportar', 'error');
             return;
         }
 
+        // Obtener todos los usuarios para mapear email -> nombre
+        const qUsuarios = query(collection(db, 'usuarios'));
+        const usuariosSnapshot = await getDocs(qUsuarios);
+
+        const usuariosMap = {};
+        usuariosSnapshot.forEach((doc) => {
+            const userData = doc.data();
+            usuariosMap[userData.email] = userData.nombre;
+        });
+
         // Preparar datos para Excel
         const data = [];
         snapshot.forEach((doc) => {
             const registro = doc.data();
+
+            // Obtener nombre del usuario, si no existe usar el email
+            const nombreUsuario = usuariosMap[registro.usuario] || registro.usuario.split('@')[0];
+
             data.push({
                 'Fecha': formatDate(registro.fecha),
                 'Hora': formatTime(registro.fecha),
                 'Ubicación': registro.ubicacion,
-                'Usuario': registro.usuario,
+                'Usuario': nombreUsuario,
                 'Tiene Reporte': registro.tieneReporte ? 'Sí' : 'No',
                 'Reporte': registro.reporte || 'N/A',
                 'Estado': registro.revisado ? 'Revisado' : 'Pendiente',
